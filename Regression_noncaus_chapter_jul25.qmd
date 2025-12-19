@@ -1,0 +1,909 @@
+---
+title: "Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian"
+subtitle: "published in Inglese, Guglielmo, Eugenio Goria and Giulia Mazzola (eds.). Diachronic and Typological Perspectives on Anticausativization. Series: Typological Studies in Language. Amsterdam: John Benjamins."
+#doi: 
+author:
+  - name: Guglielmo Inglese
+    affiliation: Università di Torino
+    orcid: https://orcid.org/0000-0003-2577-8348
+  - name: Giulia Mazzola
+    affiliation: Newcastle University
+    orcid: https://orcid.org/0000-0002-7532-8671
+  - name: Eugenio Goria
+    affiliation: Università di Torino
+  - name: Lorenzo Ferrarotti
+    affiliation: Università di Bergamo
+  - name: Bert Cornillie
+    affiliation: KU Leuven
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    toc-location: left
+---
+
+```{r}
+#| include: false
+#| warning: false
+#| message: false
+
+knitr::opts_chunk$set(
+  include = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+
+```
+
+Replication materials for: Inglese, Mazzola, Goria, Ferrarotti & Cornillie, "Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian" in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025). Full citation information will be released after publication.
+
+# Intro
+
+## Load and Prepare Data
+
+```{r packages, echo=TRUE, results='hide'}
+# List of packages used in this document
+pkgs <- c("tidyverse", "lme4", "kableExtra", "readxl", 
+          "Boruta", "ranger", "vip", "dplyr", 
+          "purrr", "stringr", "ggpattern")
+
+# Install any missing packages
+new_pkgs <- pkgs[!(pkgs %in% installed.packages()[, "Package"])]
+if(length(new_pkgs)) install.packages(new_pkgs)
+
+# Load all packages
+lapply(pkgs, library, character.only = TRUE)
+```
+
+
+```{r loaddata}
+data_all <- read_excel("romall_new_VNC_pub.xlsx")
+data <- read_excel("Inglese_et_al_noncaus_july25_newVNC_pub.xlsx")
+```
+
+```{r readfunctions, include=FALSE}
+# source files for report and plots functions
+eval(parse(text = readLines("Functions_plots_anticaus.R")))
+eval(parse(text = readLines("Functions_report.R")))
+```
+
+Data preparation, summary and NAs check:
+```{r dataprep}
+data$period <- data$vnc_period_apr25
+data$caus_use <- data$caus_use_jul25
+
+summarydata <- fct_count(data$coding)
+languagesummary <- fct_count(data$language)
+
+vars_to_check <- c("coding", "telicity", "animacy", "finiteness", "genre", "control", "language", 
+                   "reflpriming", "caus_use", "year")
+
+any_na_rows <- data[!complete.cases(data[, vars_to_check]), ]
+n_na <- nrow(any_na_rows)
+cat("Number of rows with NA in model variables:", n_na, "\n")
+
+na_counts <- colSums(is.na(data[, vars_to_check]))
+na_counts[na_counts > 0]
+```
+
+## Rationale 
+
+::: {.callout-note}
+### Object of the study
+A comparative diachronic corpus study of Italian and Spanish focuses on the alternation between **anticausativization** (reflexive marking) and **lability** as noncausal marking strategies.
+:::
+
+::: {.callout-tip}
+### Research Questions
+1. What are the factors that influence the choice between the anticausative and the labile strategies in Italian and Spanish?  
+2. Do these factors change over time?  
+3. Do the strength and relevance of these factors change when Italian and Spanish are compared?
+:::
+
+::: {.callout-warning}
+### Data
+- **Italian:** MIDIA corpus (D’Achille & Grossmann 2017), ~7.8 million words, balanced across tokens and genres (13th–mid-20th centuries).  
+- **Spanish:** Corpus del Diccionario Histórico del Español (CDH, Real Academia Española 2013), Peninsular Spanish only.
+- We extracted a sample of occurrences for the Italian and Spanish equivalents of the 20 verb meaning pairs listed in Haspelmath et al. (2014). See paper for the complete procedure.
+:::
+
+The complete dataset includes causal and noncausal uses of the verbs extracted, contained in the dataset `data_all`. For this study we only include noncausal observations and only verbs with variability (`data`). We therefore removed the verbs with categorical selection of wither anticausative or labile marking. Figure 2 and 3 show the lemmas per language and the proportion of anticausative vs. labile marking, before filtering to only include the vairable contexts.
+
+Figure 1: 
+
+```{r}
+# ---- Italian data ----
+italian_data <- data_all %>%
+  filter(semantics == "noncaus", language == "italian") %>%
+  group_by(lemma, coding) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  complete(lemma, coding = c("antic", "zero"), fill = list(n = 0)) %>%
+  group_by(lemma) %>%
+  mutate(perc = n / sum(n) * 100) %>%
+  ungroup() %>%
+  mutate(
+    coding_label = recode(coding, "antic" = "Anticausative", "zero" = "Labile"),
+    coding_label = factor(coding_label, levels = c("Anticausative", "Labile"))
+  )
+
+# Order lemmas by Anticausative %
+italian_order <- italian_data %>%
+  filter(coding_label == "Anticausative") %>%
+  arrange(desc(perc)) %>%
+  pull(lemma)
+
+italian_data <- italian_data %>%
+  mutate(lemma = factor(lemma, levels = italian_order))
+
+# ---- Plot Italian ----
+plot_italian <- ggplot(italian_data, aes(x = lemma, y = perc, fill = coding_label)) +
+  geom_col(position = "stack") +
+  scale_fill_manual(values = c("Anticausative" = "grey30", "Labile" = "grey80")) +
+  labs(x = "Verbs", y = "Percentage", fill = "Patterns") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+# ---- Print plots ----
+plot_italian
+
+```
+
+
+Figure 2:
+
+```{r}
+# ---- Spanish data ----
+spanish_data <- data_all %>%
+  filter(semantics == "noncaus", language == "spanish") %>%
+  group_by(lemma, coding) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  complete(lemma, coding = c("antic", "zero"), fill = list(n = 0)) %>%
+  group_by(lemma) %>%
+  mutate(perc = n / sum(n) * 100) %>%
+  ungroup() %>%
+  mutate(
+    coding_label = recode(coding, "antic" = "Anticausative", "zero" = "Labile"),
+    coding_label = factor(coding_label, levels = c("Anticausative", "Labile"))
+  )
+
+
+# Order lemmas by Anticausative %
+spanish_order <- spanish_data %>%
+  filter(coding_label == "Anticausative") %>%
+  arrange(desc(perc)) %>%
+  pull(lemma)
+
+spanish_data <- spanish_data %>%
+  mutate(lemma = factor(lemma, levels = spanish_order))
+
+# ---- Plot Spanish ----
+plot_spanish <- ggplot(spanish_data, aes(x = lemma, y = perc, fill = coding_label)) +
+  geom_col(position = "stack") +
+  scale_fill_manual(values = c("Anticausative" = "grey30", "Labile" = "grey80")) +
+  labs(x = "Verbs", y = "Percentage", fill = "Patterns") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
+
+plot_spanish
+
+```
+
+The filtered dataset used for this study is contained in `data` and includes `r nrow(data)` noncausal observations. The variables used in the following statistical analysis were manually annotated and are distributed as reported in the table below (Table 1 in the paper):
+
+```{r}
+library(dplyr)
+library(purrr)
+library(kableExtra)
+library(stringr)
+
+vars_to_check <- c(
+  "coding", "telicity", "animacy", "finiteness", "genre",
+  "control", "language", "reflpriming"
+)
+
+# ---- Factor variables ----
+table_factors <- map_dfr(vars_to_check, function(v) {
+
+  data %>%
+    count(.data[[v]]) %>%
+    mutate(
+      Variables = str_to_sentence(v),
+      Values = str_to_sentence(as.character(.data[[v]])),
+      `N. occurrences` = n
+    ) %>%
+    select(Variables, Values, `N. occurrences`)
+})
+
+# ---- Numeric variables (manual add) ----
+table_numeric <- tibble(
+  Variables = str_to_sentence(c("caus_use", "year")),
+  Values = c(
+    paste0(min(data$caus_use, na.rm = TRUE), " – ",
+           max(data$caus_use, na.rm = TRUE)),
+    paste0(min(data$year, na.rm = TRUE), " – ",
+           max(data$year, na.rm = TRUE))
+  ),
+  `N. occurrences` = NA_integer_
+)
+
+# ---- Combine & print ----
+bind_rows(table_factors, table_numeric) %>%
+  kbl(
+    booktabs = TRUE,
+    align = "l",
+    caption = "Distribution of variables"
+  ) %>%
+  kable_styling(
+    full_width = FALSE,
+    bootstrap_options = c("striped", "hover")
+  ) %>%
+  collapse_rows(
+    columns = 1,
+    valign = "top"
+  )
+
+```
+# Statistical analyses
+
+## Random Forest for Variable Importance
+
+As a first step in exploring our data, we fitted a random forest (RF) model to inspect the relative importance of the predictors. RF are a type of decision tree ensemble model that can be used to detect patterns in the data and assess which variables are most strongly associated with the outcome (Levshina 2020), and help us making decisions about the regression model.
+
+```{r}
+data <- data %>% mutate(across(
+  c(coding, telicity, animacy, finiteness, compound_tense, genre, time, 
+    control, aspect, language, mood, subjcoding, reflpriming), 
+  ~factor(.x)))
+
+set.seed(123)
+rf1 <- ranger(coding ~ year + caus_use_jul25 + 
+                telicity + animacy + finiteness + compound_tense + 
+                genre + time + control + aspect + language + mood +  
+                subjcoding + reflpriming,
+              data = data, importance = "impurity_corrected")
+
+
+
+```
+
+Figure 3:
+```{r}
+
+rflabels<- c( "Compound tense","Tense", "Mood", "Reflexive Priming", "Aspect",  "Subject Coding", "Finiteness", "Language", "Genre", "Animacy", "Year", "Control", "Causalness degree", "Telicity")
+
+rf_plot<-vip(rf1, num_features = 15) + scale_x_discrete(labels = rflabels)
+
+rf_plot
+```
+
+Random Forest - Variables imporance:
+
+```{r}
+vip:::vi(rf1) %>% 
+  mutate_if(is.numeric, ~ round(.x, 2)) %>%
+  kbl() %>% 
+  kable_styling()
+```
+
+Random Forest - Model diagnostics
+
+```{r}
+
+rf2 <- ranger(coding ~ year +  caus_use_jul25 + 
+                telicity + animacy + finiteness + compound_tense + 
+                genre + time + control + aspect + language + mood +  
+                subjcoding + reflpriming,
+              data = data)
+
+rf2_pred_df <- bind_cols(data, .pred = predict(rf2, data)$predictions)
+
+diagnostics <- Hmisc::somers2(as.numeric(rf2_pred_df$.pred) - 1, 
+                               as.numeric(rf2_pred_df$coding) - 1) %>% 
+  enframe() %>% 
+  mutate(value = round(value, 2))
+
+diagnostics %>% kbl() %>% kable_styling()
+```
+
+## Mixed-effect logistic regression
+
+A logistic regression model with mixed effects predicts the outcome of a binary variable (in our case, SE vs. lability) given multiple explanatory factors (and their interactions), and also includes control variables, called random effects. These models are useful when the data have a hierarchical or grouped structure, as they allow us to account for variability due to such groupings, —here, verbs (LEMMA)   and authors (AUTHOR).
+
+The models were calculated using the `lme4::glmer` function (Bates et al. 2015), fitting a maximal interaction model, i.e., including all interactions between predictors and the variables YEAR or LANGUAGE. 
+
+### Polynomial
+
+We do not assume a linear relation between year and the other predictors, i.e. we appreciate that the effects could fluctuate over time, losing predictive power or direction of the effects. This is why we included YEAR as a polynomial.
+
+We fitted a linear, quadratic and a cubic model (only with simple effects). We compared the AIC, BIC and used ANOVA to compare pairs of nested models. All these tests showed that a quadratic polynomial is the best fit for the diachronic development of the dependent variable (SE vs. lability): it improves the fit compared to the linear model and it does not need a cubic term; AIC and BIC for the quadratic models are the lowest.
+
+```{r}
+library(lme4)
+
+# Linear
+mod_lin <- glmer(coding ~ telicity + animacy + finiteness + compound_tense +genre +
+                control + language + reflpriming + caus_use + poly(year,1) +
+                (1|lemma) + (1|author),
+                family="binomial", data=data, nAGQ=0)
+# Quadratic
+
+
+mod_quad <- glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+                control + language + reflpriming + caus_use + poly(year,2) +
+                (1|lemma) + (1|author),
+                family="binomial", data=data, nAGQ=0)
+
+# Cubic
+
+mod_cub <- glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+                control + language + reflpriming + caus_use + poly(year,3) +
+                (1|lemma) + (1|author),
+                family="binomial", data=data, nAGQ=0)
+
+
+summary(mod_quad)
+
+AIC(mod_lin, mod_cub, mod_quad)
+BIC(mod_lin, mod_cub, mod_quad)
+
+anova(mod_lin, mod_quad)
+anova(mod_cub, mod_quad)
+
+```
+
+### Model selection
+
+The most parsimonious interaction model was found by performing a step-wise backward selection procedure, which consists in removing non-significant interactions one by one, starting from the one with the highest p-value.
+
+First we fit the maximal model with all variables and interactions:
+
+```{r}
+mod_all<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+                      control + language + reflpriming + caus_use + poly(year,2) +
+                #year
+                  telicity*poly(year,2) + animacy*poly(year,2) + finiteness*poly(year,2) + compound_tense*poly(year,2) + 
+                 genre*poly(year,2) + control*poly(year,2) + language*poly(year,2) + 
+                 reflpriming*poly(year,2) + caus_use*poly(year,2) +
+                #language
+                  telicity*language+ animacy*language+ finiteness*language+ compound_tense*language+ genre*language+
+                  control*language+ reflpriming*language+ caus_use*language+
+                #random
+                (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+
+summary(mod_all)
+```
+
+By inspecting the model summary we procede with the elimination of the first least significant intercation, `language*poly(year,2)`.
+
+```{r}
+# remove language:year
+
+mod1<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + finiteness*poly(year,2) + compound_tense*poly(year,2) + genre*poly(year,2) +
+              control*poly(year,2) + reflpriming*poly(year,2) + caus_use*poly(year,2) +
+              #language
+              telicity*language+ animacy*language+ finiteness*language+ compound_tense*language+ genre*language+
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod1)
+
+anova(mod_all, mod1)
+```
+
+The ANOVA comparison shows that mod1 is better than mod_all, as removing the interaction does not significantly affect the model fit (the p-value is below significance level). We proceed by removing the least significant interactions terms one-by-one and compare with ANOVA, until we reach the final model, `model12`.
+
+Remove `reflpriming:poly(year, 2)`
+
+```{r}
+# remove reflprimingyes:poly(year, 2)
+
+mod2<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + finiteness*poly(year,2) + compound_tense*poly(year,2) + genre*poly(year,2) +
+              control*poly(year,2) + caus_use*poly(year,2) +
+              #language
+              telicity*language+ animacy*language+ finiteness*language+ compound_tense*language+ genre*language+
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod2)
+
+anova(mod2, mod1)
+```
+
+Remove `finiteness:poly(year, 2)`
+
+```{r}
+#finitenessnonfin:poly(year, 2)
+
+mod3<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + caus_use*poly(year,2) +
+              #language
+              telicity*language+ animacy*language+ finiteness*language+ compound_tense*language+ genre*language+
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod3)
+anova(mod2, mod3)
+```
+
+Remove `genre:language`
+
+```{r}
+#genre:language
+
+mod4<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + caus_use*poly(year,2) +
+              #language
+              telicity*language+ animacy*language+ finiteness*language+ compound_tense*language+ 
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod4)
+anova(mod4, mod3)
+```
+
+Remove `animacy:language`
+
+```{r}
+# animacy:language
+
+mod5<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + caus_use*poly(year,2) +
+              #language
+              telicity*language+ finiteness*language+ compound_tense*language+ 
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod5)
+anova(mod4, mod5)
+```
+
+Remove `caus_use:poly(year, 2)`
+
+```{r}
+
+#caus_use:poly(year, 2)
+
+mod6<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + 
+              #language
+              telicity*language+ finiteness*language+ compound_tense*language+ 
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod6)
+anova(mod6, mod5)
+```
+
+Remove `compound_tense:language`
+
+```{r}
+#compound_tense:language
+
+mod7<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + 
+              #language
+              telicity*language+ finiteness*language+ 
+              control*language+ reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod7)
+anova(mod6, mod7)
+
+```
+
+Remove `control:language`
+
+```{r}
+#control:language  
+
+mod8<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + 
+              #language
+              telicity*language+ finiteness*language+ 
+              reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod8)
+anova(mod8, mod7)
+```
+
+Remove `finiteness:language`
+
+```{r}
+#finiteness:language 
+
+mod9<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + 
+              #language
+              telicity*language+ 
+              reflpriming*language+ caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod9)
+anova(mod9, mod8)
+```
+
+Remove `language:reflpriming`. This only marginally affects the fit, so we remove it for the sake of parsimony.
+
+```{r}
+#language:reflpriming
+
+mod10<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+              control + language + reflpriming + caus_use + poly(year,2) +
+              #year
+              telicity*poly(year,2) + animacy*poly(year,2) + compound_tense*poly(year,2) + 
+              genre*poly(year,2) +
+              control*poly(year,2) + 
+              #language
+              telicity*language+ 
+              caus_use*language+
+              #random
+              (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod10)
+anova(mod9, mod10) #marginal=remove
+```
+
+Remove `compound_tense:poly(year, 2)`. ANOVA shows it is not ok to remove, as this significantly affects the fit.
+
+```{r}
+#compound_tense:poly(year, 2)2
+
+mod11<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+               control + language + reflpriming + caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2) + animacy*poly(year,2) + 
+               genre*poly(year,2) +
+               control*poly(year,2) + 
+               #language
+               telicity*language+ 
+               caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod11)
+anova(mod11, mod10) # not ok
+```
+
+Back to `mod10`, remove `animacy:poly(year, 2)`, which only marginally affects the fit, so we remove it for the sake of parsimony.
+
+```{r}
+#animacy:poly(year, 2)1 
+
+mod12<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+               control + language + reflpriming + caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2)+ compound_tense*poly(year,2) + 
+               genre*poly(year,2) +
+               control*poly(year,2) + 
+               #language
+               telicity*language+ 
+               caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod12)
+anova(mod12, mod10) #marginal=remove
+```
+
+Remove `genre:poly(year, 2)`. This significantly affects the fit.
+
+```{r}
+#genreTeatro:poly(year, 2)1 
+
+mod13<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre +
+               control + language + reflpriming + caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2)+ compound_tense*poly(year,2) + 
+               control*poly(year,2) + 
+               #language
+               telicity*language+ 
+               caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+#summary(mod13)
+anova(mod12, mod13) #not ok
+
+#model 12 final (not possible to remove anything else)
+```
+
+Back to `mod12`, we could try to remove the simple terms that are not involved in interactions: `finiteness, reflpriming, animacy`: however these are all highly significant in the model summary of `mod12` and removing them significantly affects the fit, as shown in the code below:
+
+```{r}
+# remove finiteness
+
+mod14<-glmer(coding ~ telicity + animacy +  compound_tense + genre +
+               control + language + reflpriming + caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2)+ compound_tense*poly(year,2) + 
+               genre*poly(year,2) +
+               control*poly(year,2) + 
+               #language
+               telicity*language+ 
+               caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod14)
+anova(mod12, mod14) #not ok
+
+# remove animacy
+
+mod15<-glmer(coding ~ telicity + finiteness + compound_tense + genre +
+               control + language + reflpriming + caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2)+ compound_tense*poly(year,2) + 
+               genre*poly(year,2) +
+               control*poly(year,2) + 
+               #language
+               telicity*language+ 
+               caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod15)
+anova(mod12, mod15) #not ok
+
+# remove reflpriming
+
+mod16<-glmer(coding ~ telicity + finiteness + animacy + compound_tense + genre +
+               control + language +  caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2)+ compound_tense*poly(year,2) + 
+               genre*poly(year,2) +
+               control*poly(year,2) + 
+               #language
+               telicity*language+ 
+               caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+summary(mod16)
+anova(mod12, mod16) #not ok
+
+```
+
+The final model is `mod12`, which proves as the minimally adequate model
+
+### Model report
+
+Refit `mod12` after setting the reference level of the dependent variable `data$coding` to `zero`, and produce the reports and diagnostics of the model.
+
+```{r}
+data$coding <- relevel(data$coding, ref = "zero")  # Now "antic" is the level being predicted
+
+mod<-glmer(coding ~ telicity + animacy + finiteness + compound_tense + genre + 
+               control + language + reflpriming + caus_use + poly(year,2) +
+               #year
+               telicity*poly(year,2) + compound_tense*poly(year,2) + genre*poly(year,2) + 
+               control*poly(year,2)  +
+               #language
+               telicity*language+ caus_use*language+
+               #random
+               (1|lemma) + (1|author), family="binomial", data=data, nAGQ=0)
+
+summary(mod)
+
+report<-list_report(mod, data$coding)
+diagn<-make_diagnostics(mod, data$coding)
+
+## ---------------------------------------------------------------------------------
+data$pred_diac <- predict(mod,type="response")
+data$pred_diac <- ifelse(data$pred_diac>0.5,"anticaus", "zero")
+prop.table(table(data$pred_diac,data$coding),1)*100
+predmoddiac<-as.data.frame(table(data$pred_diac, data$coding))
+
+
+## ---------------------------------------------------------------------------------
+library(dplyr)
+library(kableExtra)
+
+diagn %>%
+  mutate_if(is.numeric, ~ round(.x, 2)) %>%
+  kbl() %>%
+  kable_styling()
+
+## ---------------------------------------------------------------------------------
+
+report$fixedsmall$LogOdds <- log(report$fixedsmall$OR)
+
+
+report$fixedsmall %>% 
+  mutate_if(is.numeric, ~ round(.x, 2)) %>%
+  kbl() %>%
+  kable_styling()
+
+
+
+```
+
+### Model Visualisation
+
+#### Random effects
+
+Figure 4: 
+
+```{r}
+ranef_data <- lme4::ranef(mod)[["lemma"]]
+
+names <- rownames(ranef_data)
+rownames(ranef_data) <- NULL
+ranef_data <- cbind(names,ranef_data)
+
+ranefdata2 <-
+  left_join(ranef_data,
+            data %>% dplyr::select(lemma, language)%>% rename(names=lemma) %>% unique,
+            by = "names")
+
+ranefdata2<- ranefdata2 %>% 
+  rename(Intercept = `(Intercept)`, Variable= names) %>% 
+  mutate(color = ifelse(language == "italian", "red", "#f1947a"))
+
+colors <- ranefdata2$color[order(ranefdata2$Intercept)]
+
+library(ggpattern)
+
+ranefdata2 %>% 
+  ggplot(aes(y = Intercept, x = reorder(Variable, Intercept), fill=language, pattern=Intercept>0)) + 
+  geom_bar_pattern(stat="identity",
+                   position = position_dodge(0.9), 
+                   pattern_fill = "black",
+                   pattern_angle = 45,
+                   pattern_density = 0.1,
+                   pattern_spacing = 0.025,
+                   pattern_key_scale_factor = 0.6,
+                   alpha=0.8,
+                   colour="#e9ecef") +
+  scale_fill_manual(name = "Language", values = setNames(c("red", "#f1947a"),c("italian", "spanish")), labels = c( "italian", "spanish"))+
+  scale_pattern_manual(values = c("none", "stripe"), labels=c("zero", "anticausative"))+
+  labs(y = "Log-odds", x="LEMMA", pattern= "Coding pattern") +
+  coord_flip() +
+  theme_minimal(base_size = 9)+
+  guides(pattern = guide_legend(override.aes = list(fill = "grey")),
+         fill = guide_legend(override.aes = list(pattern = "none")))+
+  theme(axis.text.y = element_text(colour= colors))
+
+
+```
+#### Simple effects
+
+Figure 5:
+
+```{r}
+effects_list2 <- purrr::map(c( "finiteness","reflpriming", "animacy"),
+                           ~simpleff(mod, .x) + 
+    theme_minimal(base_size = 9, base_family = "cambria")+
+    labs(x="", y="")+
+    theme(text = element_text(colour = "black"),
+          axis.text = element_text(colour = "black")
+    )
+)
+
+cowplot::plot_grid(plotlist = effects_list2,  align = "v")
+
+```
+
+Figure 6:
+
+```{r}
+year_eff<-makeff(mod, "year")
+yearplot<-ggplot(year_eff, aes(x=x, y=predicted, group=1)) +
+  geom_line(size=0.7, color=safe[1])+
+  labs(x= "Real time", y="")+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6), limits = c(0,1), labels = scales::percent)+
+  theme_minimal(base_size = 9)
+
+yearplot<-yearplot+ggtitle("YEAR")
+yearplot +  theme_minimal(base_size = 15) + geom_line(size=1.2, color=safe[1])
+
+```
+
+
+
+#### Interactions
+
+Figure 7:
+
+```{r}
+diacsmooth(mod, var=c("year", "compound_tense"))
+```
+
+
+Figure 8:
+
+```{r}
+diacsmooth(mod, var=c("year", "control"))
+
+```
+
+
+Figure 9:
+
+```{r}
+diacsmooth(mod, var=c("year", "telicity"))
+```
+
+
+Figure 10
+
+```{r}
+diacsmooth(mod, var=c("year", "genre"))
+```
+
+
+Figure 11:
+```{r}
+interplot(mod, var=c("telicity", "language"))
+```
+
+
+Figure 12:
+
+```{r}
+df<-table(data$azion, data$coding, data$language) %>% as.data.frame()
+colnames(df)<-c("var", "altern", "language", "freq")
+df$var<-df$var %>%  fct_relevel(c("accomplishment", "achievement", "degree", "activity"))
+ 
+ ggplot(df, aes(y=freq, x=var, fill=altern)) +
+     geom_bar(position="fill", stat="identity", alpha=0.8)+
+     scale_y_continuous(labels = scales::percent)+
+     theme(legend.title = element_blank())+
+     labs (x="", y= "")+ coord_flip()+
+     facet_wrap(vars(language), ncol = 5)+
+     scale_fill_manual(values=safe[c(2,1)])
+```
+
+
+Figure 13:
+
+```{r}
+diacsmooth(mod, var=c("caus_use", "language"))+xlab("Causal %")
+```
+
+Figure 14:
+
+```{r}
+
+caus_eff<-makeff(mod, "caus_use")
+
+causplot<-ggplot(caus_eff, aes(x=x, y=predicted, group=1)) +
+  geom_line(size=1.2, color=safe[1])+
+  labs(title= "CAUSALNESS DEGREE", x="Causalness degree", y="")+
+  scale_y_continuous(breaks = scales::pretty_breaks(n = 6), limits = c(0,1), labels = scales::percent)+
+  theme_minimal(base_size = 9)
+
+causplot +  theme_minimal(base_size = 15) + geom_line(size=1.2, color=safe[1])
+
+```
+
+
+
+

@@ -1,0 +1,10 @@
+project:
+  type: website
+  output-dir: docs   # this is the folder GitHub Pages will serve
+
+format:
+  html:
+    toc: true
+    toc-depth: 4
+    toc-location: left
+    theme: cosmo 
