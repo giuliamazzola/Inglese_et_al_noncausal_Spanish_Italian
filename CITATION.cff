@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software or the associated data, please cite it as below."
-title: Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, “Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian” in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025)
+title: Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, “Anticausativization and lability in Romance a historical corpus study on Spanish and Italian” in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025)
 version: 1.0.0
 doi: TBA
 release-date: YYYY-MM-DD
@@ -31,7 +31,7 @@ license: MIT
 
 preferred-citation:
   type: generic
-  title: "Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, “Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian” in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025)"
+  title: "Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, “Anticausativization and lability in Romance a historical corpus study on Spanish and Italian” in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025)"
   authors:
     - family-names: Inglese
     given-names: Guglielmo 
