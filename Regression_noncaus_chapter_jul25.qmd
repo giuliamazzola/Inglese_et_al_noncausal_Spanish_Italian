@@ -781,7 +781,7 @@ ranefdata2 %>%
                    pattern_key_scale_factor = 0.6,
                    alpha=0.8,
                    colour="#e9ecef") +
-  scale_fill_manual(name = "Language", values = setNames(c("red", "#f1947a"),c("italian", "spanish")), labels = c( "italian", "spanish"))+
+  scale_fill_manual(name = "Language", values = setNames(c("red", "#f1947a"),c("Italian", "Spanish")), labels = c( "Italian", "Spanish"))+
   scale_pattern_manual(values = c("none", "stripe"), labels=c("zero", "anticausative"))+
   labs(y = "Log-odds", x="LEMMA", pattern= "Coding pattern") +
   coord_flip() +
