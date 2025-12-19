@@ -1,55 +1,56 @@
 cff-version: 1.2.0
 message: "If you use this software or the associated data, please cite it as below."
-title: Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, “Anticausativization and lability in Romance a historical corpus study on Spanish and Italian” in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025)
+
+title: "Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, 
+Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian,
+in Inglese, Mazzola & Goria Diachronic and Typological Perspectives on Anticausativization
+(Accepted December 2025)"
+
 version: 1.0.0
 doi: TBA
 release-date: YYYY-MM-DD
 
 authors:
   - family-names: Inglese
-    given-names: Guglielmo 
-    affiliation: Università di Torino 
-    orcid: https://orcid.org/0000-0003-2577-8348 
+    given-names: Guglielmo
+    affiliation: Università di Torino
+    orcid: https://orcid.org/0000-0003-2577-8348
+
   - family-names: Mazzola
     given-names: Giulia
     affiliation: Newcastle University
     orcid: https://orcid.org/0000-0002-7532-8671
+
   - family-names: Goria
     given-names: Eugenio
     affiliation: Università di Torino
+
   - family-names: Ferrarotti
     given-names: Lorenzo
     affiliation: Università di Bergamo
+
   - family-names: Cornillie
     given-names: Bert
     affiliation: KU Leuven
 
-  
 repository-code: TBA
-
 license: MIT
 
 preferred-citation:
   type: generic
-  title: "Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie, “Anticausativization and lability in Romance a historical corpus study on Spanish and Italian” in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025)"
+  title: "Replication materials for Inglese, Mazzola, Goria, Ferrarotti & Cornillie,
+Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian"
   authors:
     - family-names: Inglese
-    given-names: Guglielmo 
-    affiliation: Università di Torino 
-    orcid: https://orcid.org/0000-0003-2577-8348 
-  - family-names: Mazzola
-    given-names: Giulia
-    affiliation: Newcastle University
-    orcid: https://orcid.org/0000-0002-7532-8671
-  - family-names: Goria
-    given-names: Eugenio
-    affiliation: Università di Torino
-  - family-names: Ferrarotti
-    given-names: Lorenzo
-    affiliation: Università di Bergamo
-  - family-names: Cornillie
-    given-names: Bert
-    affiliation: KU Leuven
-  year: 2026 (to appear)
+      given-names: Guglielmo
+    - family-names: Mazzola
+      given-names: Giulia
+    - family-names: Goria
+      given-names: Eugenio
+    - family-names: Ferrarotti
+      given-names: Lorenzo
+    - family-names: Cornillie
+      given-names: Bert
+  year: 2026
   publisher: Zenodo
   doi: TBA
