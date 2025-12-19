@@ -37,6 +37,13 @@ knitr::opts_chunk$set(
 
 Replication materials for: Inglese, Mazzola, Goria, Ferrarotti & Cornillie, "Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian" in Inglese, Mazzola & Goria *Diachronic and Typological Perspectives on Anticausativization* (Accepted December 2025). Full citation information will be released after publication.
 
+<div style="text-align:right">
+  <a href="https://github.com/giuliamazzola/Inglese_et_al_noncausal_Spanish_Italian" target="_blank">
+    <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" width="30" alt="GitHub repository">
+  </a>
+</div>
+
+
 # Intro
 
 ## Load and Prepare Data
@@ -84,6 +91,14 @@ cat("Number of rows with NA in model variables:", n_na, "\n")
 
 na_counts <- colSums(is.na(data[, vars_to_check]))
 na_counts[na_counts > 0]
+
+data <- data %>% mutate(across(
+  c(coding, telicity, animacy, finiteness, compound_tense, genre, time, 
+    control, aspect, language, mood, subjcoding, reflpriming), 
+  ~factor(.x)))
+
+levels(data$language) <- str_to_sentence(levels(data$language))
+
 ```
 
 ## Rationale 
@@ -191,10 +206,6 @@ plot_spanish
 The filtered dataset used for this study is contained in `data` and includes `r nrow(data)` noncausal observations. The variables used in the following statistical analysis were manually annotated and are distributed as reported in the table below (Table 1 in the paper):
 
 ```{r}
-library(dplyr)
-library(purrr)
-library(kableExtra)
-library(stringr)
 
 vars_to_check <- c(
   "coding", "telicity", "animacy", "finiteness", "genre",
@@ -250,10 +261,6 @@ bind_rows(table_factors, table_numeric) %>%
 As a first step in exploring our data, we fitted a random forest (RF) model to inspect the relative importance of the predictors. RF are a type of decision tree ensemble model that can be used to detect patterns in the data and assess which variables are most strongly associated with the outcome (Levshina 2020), and help us making decisions about the regression model.
 
 ```{r}
-data <- data %>% mutate(across(
-  c(coding, telicity, animacy, finiteness, compound_tense, genre, time, 
-    control, aspect, language, mood, subjcoding, reflpriming), 
-  ~factor(.x)))
 
 set.seed(123)
 rf1 <- ranger(coding ~ year + caus_use_jul25 + 
@@ -318,7 +325,6 @@ We do not assume a linear relation between year and the other predictors, i.e. w
 We fitted a linear, quadratic and a cubic model (only with simple effects). We compared the AIC, BIC and used ANOVA to compare pairs of nested models. All these tests showed that a quadratic polynomial is the best fit for the diachronic development of the dependent variable (SE vs. lability): it improves the fit compared to the linear model and it does not need a cubic term; AIC and BIC for the quadratic models are the lowest.
 
 ```{r}
-library(lme4)
 
 # Linear
 mod_lin <- glmer(coding ~ telicity + animacy + finiteness + compound_tense +genre +
@@ -339,9 +345,6 @@ mod_cub <- glmer(coding ~ telicity + animacy + finiteness + compound_tense + gen
                 control + language + reflpriming + caus_use + poly(year,3) +
                 (1|lemma) + (1|author),
                 family="binomial", data=data, nAGQ=0)
-
-
-summary(mod_quad)
 
 AIC(mod_lin, mod_cub, mod_quad)
 BIC(mod_lin, mod_cub, mod_quad)
@@ -723,8 +726,6 @@ predmoddiac<-as.data.frame(table(data$pred_diac, data$coding))
 
 
 ## ---------------------------------------------------------------------------------
-library(dplyr)
-library(kableExtra)
 
 diagn %>%
   mutate_if(is.numeric, ~ round(.x, 2)) %>%
@@ -768,8 +769,6 @@ ranefdata2<- ranefdata2 %>%
   mutate(color = ifelse(language == "italian", "red", "#f1947a"))
 
 colors <- ranefdata2$color[order(ranefdata2$Intercept)]
-
-library(ggpattern)
 
 ranefdata2 %>% 
   ggplot(aes(y = Intercept, x = reorder(Variable, Intercept), fill=language, pattern=Intercept>0)) + 
