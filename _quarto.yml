@@ -1,10 +1,18 @@
 project:
   type: website
-  output-dir: docs   # this is the folder GitHub Pages will serve
+  output-dir: docs   # GitHub Pages will serve this folder
 
 format:
   html:
     toc: true
     toc-depth: 4
     toc-location: left
-    theme: cosmo 
+    theme: cosmo
+    output-file: index.html  # Force this QMD to render as index.html
+
+website:
+  title: "Anticausativization and lability in Romance: a historical corpus study on Spanish and Italian"
+  navbar:
+    left:
+      - text: "Home"
+        href: index.html
